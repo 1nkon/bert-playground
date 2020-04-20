@@ -14,11 +14,11 @@ def hello_world():
     if not request.is_json:
         abort(Response("Json expected"))
 
-    sentence = request.json['sentence']
+    json = request.json
+    sentence = json['sentence']
     data = pipeline.do_find(sentence)
-    response = app.response_class(
-        response=data.to_json(orient='table', index=False),
-        status=200,
-        mimetype='application/json'
-    )
-    return response
+    if 'simple' not in json or not json['simple']:
+        json_data = data.to_json(orient='table', index=False)
+    else:
+        json_data = data['word'].to_json(orient='values')
+    return app.response_class(response=json_data, status=200, mimetype='application/json')

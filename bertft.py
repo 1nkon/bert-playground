@@ -118,16 +118,16 @@ class Pipeline:
 
         print("Input: ", sentence)
         start_time = time.time()
-        sentence_match = re.search("(\w+)\$(\w+)?", sentence)
+        sentence_match = re.search("(\w+)#(\w+)?", sentence)
         target = None
         wnl = None
 
         if sentence_match:
-            target = re.sub("\$", "", sentence_match.group(1))
+            target = re.sub("#", "", sentence_match.group(1))
             wnl = sentence_match.group(2)
             target = target.strip()
 
-        sequence = re.sub("(\w+)?\$(\w+)?", tokenizer.mask_token, sentence)
+        sequence = re.sub("(\w+)?#(\w+)?", tokenizer.mask_token, sentence)
 
         input = tokenizer.encode(sequence, return_tensors="pt")
         mask_token_index = torch.where(input == tokenizer.mask_token_id)[1]
