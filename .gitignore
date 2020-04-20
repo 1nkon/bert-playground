@@ -1,3 +1,5 @@
 .ipynb_checkpoints/
 data
 Untitled.ipynb
+.idea
+__pycache__
