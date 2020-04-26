@@ -3,7 +3,6 @@
 from transformers import AutoModelWithLMHead, AutoTokenizer
 import torch
 import re
-import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics.pairwise import cosine_similarity
@@ -12,39 +11,13 @@ from pathlib import Path
 import fasttext.util
 from .utils import ROOT_DIR
 
-import nltk
-
-nltk.download('wordnet')
-from nltk.corpus import wordnet
-
 
 def lget(lst, pos):
     return list(map(lambda x: x[pos], lst))
 
 
-def dget(lst, pos):
-    return list(map(lambda x: '{0:.2f}'.format(x[pos]), lst))
-
-
 def calc_w(x, y, w):
     return x * w[0] + y * w[1]
-
-
-# https://www.nltk.org/howto/wordnet.html
-def print_wordnet_data(target, wnl):
-    syns = wordnet.synsets(target)
-    lemmas = set()
-    hyponyms = set()
-    for s in syns:
-        if (s.lexname()[0] == wnl):
-            for l in s.lemmas():
-                lemmas.add(l.name())
-            for h in s.hyponyms():
-                for l in h.lemmas():
-                    hyponyms.add(l.name())
-
-    print("Lemmas:", lemmas)
-    print("Hyponyms:", hyponyms)
 
 
 def mk_graph(x1):
@@ -72,7 +45,6 @@ def mk_graph2(x1):
 
 
 # TODO: make Model configurable
-# TODO: merge with ipynb
 class Pipeline:
     def __init__(self, interactive=False):
         start_time = time.time()
@@ -121,11 +93,9 @@ class Pipeline:
         start_time = time.time()
         sentence_match = re.search("(\w+)#(\w+)?", sentence)
         target = None
-        wnl = None
 
         if sentence_match:
             target = re.sub("#", "", sentence_match.group(1))
-            wnl = sentence_match.group(2)
             target = target.strip()
 
         sequence = re.sub("(\w+)?#(\w+)?", tokenizer.mask_token, sentence)
@@ -171,10 +141,10 @@ class Pipeline:
 
         filtered_top = pd.DataFrame({
             'word': lget(kfiltered, 0),
-            'bert': dget(kfiltered, 1),
-            'normalized': dget(kfiltered, 2),
-            'ftext': dget(kfiltered, 3),
-            'score': dget(kfiltered, 4)
+            'bert': self.dget(kfiltered, 1),
+            'normalized': self.dget(kfiltered, 2),
+            'ftext': self.dget(kfiltered, 3),
+            'score': self.dget(kfiltered, 4)
         })
 
         if self.interactive:
@@ -183,10 +153,10 @@ class Pipeline:
 
                 print(pd.DataFrame({
                     'word': lget(kunfiltered, 0),
-                    'bert': dget(kunfiltered, 1),
-                    'normalized': dget(kunfiltered, 2),
-                    'ftext': dget(kunfiltered, 3),
-                    'score': dget(kunfiltered, 4)
+                    'bert': self.dget(kunfiltered, 1),
+                    'normalized': self.dget(kunfiltered, 2),
+                    'ftext': self.dget(kunfiltered, 3),
+                    'score': self.dget(kunfiltered, 4)
                 }))
 
             print("Filtered top:")
@@ -215,9 +185,6 @@ class Pipeline:
                     else:
                         print("Original word wasn't found")
 
-                if wnl is not None:
-                    print_wordnet_data(target, wnl)
-
         print("Finished in %s seconds" % '{0:.4f}'.format(done))
         print("===================")
 
@@ -225,3 +192,6 @@ class Pipeline:
 
     def do_find(self, s):
         return self.find_top(s, 10, 200, 200, 0.25, [1, 1])
+
+    def dget(self, lst, pos):
+        return list(map( lambda x: '{0:.2f}'.format(x[pos]), lst)) if self.interactive else lget(lst, pos)
