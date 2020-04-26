@@ -1,0 +1,1 @@
+from .bertft import Pipeline

@@ -2,11 +2,11 @@ from flask import Flask
 from flask import request
 from flask import abort
 from flask import Response
-import bertft
+from bertft import Pipeline
 
 app = Flask(__name__)
 
-pipeline = bertft.Pipeline()
+pipeline = Pipeline()
 
 
 @app.route('/', methods=['POST'])

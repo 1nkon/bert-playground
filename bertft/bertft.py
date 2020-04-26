@@ -10,6 +10,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 from pathlib import Path
 import fasttext.util
+from .utils import ROOT_DIR
 
 import nltk
 
@@ -82,7 +83,7 @@ class Pipeline:
         self.ft_size = ft_size
 
         def get_ft_path(n):
-            return os.getcwd() + "/data/cc.en." + str(n) + ".bin"
+            return ROOT_DIR + "/data/cc.en." + str(n) + ".bin"
 
         cur_path = get_ft_path(ft_size)
 
