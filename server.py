@@ -16,7 +16,10 @@ def hello_world():
 
     json = request.json
     sentence = json['sentence']
-    data = pipeline.do_find(sentence)
+    upper = None if 'upper' not in json else json['upper']
+    lower = None if 'lower' not in json else json['lower']
+    positions = None if upper is None or lower is None else [lower, upper]
+    data = pipeline.do_find(sentence, positions)
     if 'simple' not in json or not json['simple']:
         json_data = data.to_json(orient='table', index=False)
     else:

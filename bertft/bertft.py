@@ -45,6 +45,7 @@ def mk_graph2(x1):
 
 
 # TODO: make Model configurable
+# TODO: add type check
 class Pipeline:
     def __init__(self, interactive=False):
         start_time = time.time()
@@ -74,6 +75,7 @@ class Pipeline:
             ft.save_model(cur_path)
 
         self.ft = ft
+        self.ft_dict = set(ft.get_words())
 
         print("Loading bert")
         # ~3 GB
@@ -84,7 +86,8 @@ class Pipeline:
 
         print("Server started in %s seconds" % ('{0:.4f}'.format(time.time() - start_time)))
 
-    def find_top(self, sentence, k, top_bert, bert_norm, min_ftext, weights):
+    # TODO(?): remove split by #
+    def find_top(self, sentence, positions, k, top_bert, bert_norm, min_ftext, weights):
         tokenizer = self.tokenizer
         model = self.model
         ft = self.ft
@@ -97,8 +100,31 @@ class Pipeline:
         if sentence_match:
             target = re.sub("#", "", sentence_match.group(1))
             target = target.strip()
+            sequence = re.sub("(\w+)?#(\w+)?", tokenizer.mask_token, sentence)
+        else:
+            lst = sentence.split()
+            lower = positions[0]
+            upper = positions[1] + 1
+            target = "-".join(lst[lower:upper])
+            if lower == positions[1] or target in self.ft_dict:
+                seqlst = lst[:lower]
+                seqlst.append(tokenizer.mask_token)
+                seqlst.extend(lst[upper:])
+                sequence =  " ".join(seqlst)
+            else:
+                rec = list()
 
-        sequence = re.sub("(\w+)?#(\w+)?", tokenizer.mask_token, sentence)
+                for i in range(lower, upper):
+                    seqlst = lst[:lower]
+                    seqlst.append(lst[i])
+                    seqlst.extend(lst[upper:])
+                    rec.append(self.find_top(" ".join(seqlst), [lower, lower], k, top_bert, bert_norm, min_ftext, weights))
+
+                rec = sorted(rec, key = lambda x: x.score.mean(), reverse=True)
+
+                return rec[0]
+
+        print("Target word:", target, "; sequence: ", sequence)
 
         input = tokenizer.encode(sequence, return_tensors="pt")
         mask_token_index = torch.where(input == tokenizer.mask_token_id)[1]
@@ -116,20 +142,28 @@ class Pipeline:
         norm_d = top_tokens[bert_norm - 1][1]
         norm_k = top_tokens[0][1] - norm_d
 
+        print("Bert finished in %s seconds" % '{0:.4f}'.format(time.time() - start_time))
+
         # Filter bert output by <min_ftext>
+        # TODO: calculate batch similarity
         for token, value in top_tokens:
             word = tokenizer.decode([token]).strip()
             norm_value = (value - norm_d) / norm_k
 
             sim = cosine_similarity(ft[target].reshape(1, -1), ft[word].reshape(1, -1))[0][0]
 
+            sentence_sim = cosine_similarity(
+                ft.get_sentence_vector(re.sub("#", "", sentence)).reshape(1, -1),
+                ft.get_sentence_vector(re.sub(tokenizer.mask_token, word, sequence)).reshape(1, -1)
+            )[0][0]
+
             if not self.interactive and word == target:
                 continue
 
             if sim >= min_ftext:
-                filtered.append((word, value, norm_value, sim, calc_w(norm_value, sim, weights)))
+                filtered.append((word, value, norm_value, sim, sentence_sim, calc_w(norm_value, sim, weights)))
 
-            unfiltered.append((word, value, norm_value, sim, calc_w(norm_value, sim, weights)))
+            unfiltered.append((word, value, norm_value, sim, sentence_sim, calc_w(norm_value, sim, weights)))
 
         done = (time.time() - start_time)
 
@@ -144,7 +178,8 @@ class Pipeline:
             'bert': self.dget(kfiltered, 1),
             'normalized': self.dget(kfiltered, 2),
             'ftext': self.dget(kfiltered, 3),
-            'score': self.dget(kfiltered, 4)
+            'ftext-sentence': self.dget(kfiltered, 4),
+            'score': lget(kfiltered, 5),
         })
 
         if self.interactive:
@@ -156,7 +191,8 @@ class Pipeline:
                     'bert': self.dget(kunfiltered, 1),
                     'normalized': self.dget(kunfiltered, 2),
                     'ftext': self.dget(kunfiltered, 3),
-                    'score': self.dget(kunfiltered, 4)
+                    'ftext-sentence': self.dget(kunfiltered, 4),
+                    'score': lget(kunfiltered, 5),
                 }))
 
             print("Filtered top:")
@@ -190,8 +226,8 @@ class Pipeline:
 
         return filtered_top
 
-    def do_find(self, s):
-        return self.find_top(s, 10, 200, 200, 0.25, [1, 1])
+    def do_find(self, s, positions):
+        return self.find_top(s, positions, 10, 200, 200, 0.25, [1, 1])
 
     def dget(self, lst, pos):
         return list(map( lambda x: '{0:.2f}'.format(x[pos]), lst)) if self.interactive else lget(lst, pos)
